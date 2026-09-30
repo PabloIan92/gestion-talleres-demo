@@ -219,6 +219,19 @@ export function FacturacionView() {
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <button
             type="button"
+            onClick={() => {
+              const candidato = casos.find(c => c.estado === 'firmado') || casos.find(c => c.estado === 'facturado') || casos[0]
+              setCasoParaEmitirX(candidato || null)
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-mono font-bold uppercase bg-slate-800 hover:bg-slate-900 text-white transition rounded-sm shadow-sm cursor-pointer"
+            title="Emitir comprobante interno (Factura X / Remito / Recibo) no declarado a ARCA"
+          >
+            <Sparkles size={14} className="text-amber-400" />
+            <span>+ Emitir Factura X / Remito</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setModalArcaAbierto(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold uppercase border border-navy bg-navy text-white hover:bg-navy/90 transition rounded-sm shadow-sm cursor-pointer"
             title="Configuración de conexión y credenciales de ARCA (ex-AFIP)"
@@ -464,17 +477,19 @@ export function FacturacionView() {
                     </td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        {item.estado === 'firmado' && (
-                          <button
-                            type="button"
-                            onClick={() => setCasoParaEmitirX(item.caso_original)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-slate-800 text-white hover:bg-slate-900 transition rounded-sm cursor-pointer shadow-xs"
-                            title="Emitir Factura X o Remito no fiscal"
-                          >
-                            <Sparkles size={11} className="text-amber-400" />
-                            <span>Factura X</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setCasoParaEmitirX(item.caso_original)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono rounded-sm cursor-pointer transition shadow-xs ${
+                            item.estado === 'firmado'
+                              ? 'bg-slate-800 text-white hover:bg-slate-900 font-bold ring-2 ring-amber-400'
+                              : 'bg-slate-700 text-white hover:bg-slate-800'
+                          }`}
+                          title="Emitir Factura X o Remito no fiscal sobre este vehículo"
+                        >
+                          <Sparkles size={12} className="text-amber-400" />
+                          <span>{item.estado === 'firmado' ? 'Emitir FX' : 'Factura X'}</span>
+                        </button>
                         <button
                           onClick={() => setCasoSeleccionado(item.caso_original)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono border border-navy text-navy hover:bg-navy hover:text-white transition rounded-sm cursor-pointer"
@@ -530,6 +545,26 @@ export function FacturacionView() {
               >
                 <X size={20} />
               </button>
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-[11px] font-mono uppercase text-steel-500 mb-1 font-semibold">
+                Vehículo / Caso a Facturar:
+              </label>
+              <select
+                value={casoParaEmitirX.id}
+                onChange={(e) => {
+                  const encontrado = casos.find(c => c.id === e.target.value)
+                  if (encontrado) setCasoParaEmitirX(encontrado)
+                }}
+                className="w-full px-2.5 py-1.5 text-xs font-sans border border-steel-300 bg-white rounded-xs focus:border-navy"
+              >
+                {casos.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.orden_numero} — {c.patente} — {c.vehiculo_marca_modelo} ({c.cliente_nombre}) [Etapa: {c.estado}]
+                  </option>
+                ))}
+              </select>
             </div>
 
             <SeccionComprobanteInternoX
