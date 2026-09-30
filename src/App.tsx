@@ -3,7 +3,7 @@ import { DemoStoreProvider, useDemoStore } from './context/DemoStoreContext'
 import { Topbar } from './layout/Topbar'
 import { Sidebar } from './layout/Sidebar'
 import { BottomTabBar } from './layout/BottomTabBar'
-import { PlanillaControlTaller } from './components/PlanillaControlTaller'
+import { PlanillaControl } from './components/PlanillaControl'
 import { VistaStock } from './components/VistaStock'
 import { FacturacionView } from './components/FacturacionView'
 import { VistaInformes } from './components/VistaInformes'
@@ -94,7 +94,10 @@ const AppContent: React.FC = () => {
 
         <main className="flex-1 w-full max-w-full min-w-0 p-3 sm:p-6 overflow-y-auto">
           {(tab === 'casos' || tab === 'turnos') && (
-            <PlanillaControlTaller onOpenNuevoCaso={() => setIsNuevoCasoOpen(true)} />
+            <PlanillaControl
+              onOpenNuevoCaso={() => setIsNuevoCasoOpen(true)}
+              onNavigateTab={handleSelectTab}
+            />
           )}
 
           {tab === 'facturacion' && <FacturacionView />}

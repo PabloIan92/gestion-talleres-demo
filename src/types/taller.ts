@@ -12,7 +12,8 @@ export const ETAPAS_CASO = [
   'firmado',
   'facturado',
   'cobrado',
-  'reclamo a la compañía'
+  'reclamo a la compañía',
+  'cancelado'
 ] as const
 
 export type EtapaCaso = typeof ETAPAS_CASO[number]

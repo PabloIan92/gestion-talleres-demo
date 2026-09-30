@@ -5,9 +5,6 @@ import {
   Menu,
   X,
   Bell,
-  UserCheck,
-  Wrench,
-  ShieldCheck,
   RotateCcw,
 } from 'lucide-react'
 import type { DemoRole } from '../types/taller'
@@ -53,7 +50,7 @@ export function Topbar({
           >
             <img
               src="./logo-taller.svg"
-              alt="Logo Taller"
+              alt="Sistema de Gestión para Talleres"
               className="h-10 sm:h-12 md:h-14 w-auto object-contain rounded-md shadow-md border border-white/25 shrink-0 group-hover:brightness-110 transition-all"
             />
             <div className="flex flex-col justify-center min-w-0">
@@ -70,31 +67,12 @@ export function Topbar({
           </button>
         </div>
 
-        {/* Desktop Controls (hidden on mobile < 768px) */}
+        {/* Desktop Controls (exactamente en el orden original de producción) */}
         <div className="hidden md:flex items-center justify-end gap-2 sm:gap-2.5">
-          {/* Interactive Role Switcher for Demo testing */}
-          <div className="flex items-center bg-black/25 rounded p-0.5 border border-white/20 mr-1">
-            <span className="text-[10px] font-mono uppercase text-steel-300 px-2 font-semibold">
-              Rol Demo:
-            </span>
-            {(['dueno', 'recepcion', 'taller'] as DemoRole[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => onRoleChange(r)}
-                className={`px-2.5 py-1 text-xs font-mono font-bold uppercase rounded-xs transition-colors cursor-pointer ${
-                  currentRole === r
-                    ? 'bg-blue text-white shadow-xs'
-                    : 'text-steel-300 hover:text-white hover:bg-white/10'
-                }`}
-                title={`Cambiar a vista de ${ROLE_LABELS[r]}`}
-              >
-                {ROLE_LABELS[r]}
-              </button>
-            ))}
-          </div>
-
+          {/* 1. Botón Descargar App */}
           <BotonDescargarApp />
 
+          {/* 2. Botón Guía */}
           <button
             type="button"
             onClick={() => onSelectTab('guia')}
@@ -105,6 +83,7 @@ export function Topbar({
             <span>Guía</span>
           </button>
 
+          {/* 3. Botón Nuevo Caso */}
           {(currentRole === 'dueno' || currentRole === 'recepcion') && (
             <button
               type="button"
@@ -117,7 +96,7 @@ export function Topbar({
             </button>
           )}
 
-          {/* Notificaciones */}
+          {/* 4. Campana de Notificaciones */}
           <div className="relative">
             <button
               type="button"
@@ -151,10 +130,32 @@ export function Topbar({
             )}
           </div>
 
-          {/* Badge de Rol */}
-          <span className="font-mono text-xs border border-white/35 bg-white/10 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-sm inline-block font-semibold">
-            {ROLE_LABELS[currentRole]}
-          </span>
+          {/* 5. Badge de Rol interactivo en la misma ubicación del badge original */}
+          <div className="relative inline-block">
+            <select
+              value={currentRole}
+              onChange={(e) => onRoleChange(e.target.value as DemoRole)}
+              className="font-mono text-xs border border-white/35 bg-white/10 text-white px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-sm inline-block font-semibold cursor-pointer hover:bg-white/20 transition-colors pr-6 appearance-none"
+              title="Cambiar rol activo en la demo"
+            >
+              <option value="dueno" className="bg-[#123a6b] text-white">Dueño</option>
+              <option value="recepcion" className="bg-[#123a6b] text-white">Recepción</option>
+              <option value="taller" className="bg-[#123a6b] text-white">Taller</option>
+            </select>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-steel-300">▼</span>
+          </div>
+
+          {/* 6. Botón de Reiniciar Demo en la misma ubicación de "Cerrar sesión" */}
+          {onResetData && (
+            <button
+              type="button"
+              className="border border-white/32 bg-transparent text-white font-semibold px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-sm transition-colors hover:bg-white/10 cursor-pointer text-xs font-sans"
+              onClick={onResetData}
+              title="Restablecer los 12 casos de demostración"
+            >
+              Reiniciar Demo
+            </button>
+          )}
         </div>
 
         {/* Mobile Compact Controls (visible on < 768px) */}
