@@ -144,6 +144,8 @@ export const CASOS_INICIALES: CasoDemo[] = [
     zonas_dano: ['paragolpes trasero'],
     presupuesto_monto: 680000,
     facturado_monto: 680000,
+    numero_factura: 'FX-0001-00000104',
+    fecha_factura: '2026-09-20',
     created_at: '2026-09-20',
     inspeccion_guardada: true
   },
@@ -169,6 +171,8 @@ export const CASOS_INICIALES: CasoDemo[] = [
     presupuesto_monto: 960000,
     facturado_monto: 960000,
     cobrado_monto: 960000,
+    numero_factura: 'FC-A-0001-00001235',
+    fecha_factura: '2026-09-18',
     created_at: '2026-09-18',
     inspeccion_guardada: true
   },
@@ -194,6 +198,8 @@ export const CASOS_INICIALES: CasoDemo[] = [
     presupuesto_monto: 780000,
     facturado_monto: 780000,
     cobrado_monto: 610000,
+    numero_factura: 'FC-A-0001-00001236',
+    fecha_factura: '2026-09-19',
     created_at: '2026-09-19',
     inspeccion_guardada: true
   },

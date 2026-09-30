@@ -71,6 +71,8 @@ export interface CasoDemo {
   presupuesto_monto: number
   facturado_monto?: number
   cobrado_monto?: number
+  numero_factura?: string
+  fecha_factura?: string
   created_at: string
   inspeccion_guardada: boolean
 }

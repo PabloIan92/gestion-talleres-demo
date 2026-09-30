@@ -3,7 +3,10 @@ import { useDemoStore } from '../context/DemoStoreContext'
 import type { CasoDemo, EtapaCaso } from '../types/taller'
 import { ETAPAS_CASO, TIPOS_SERVICIO } from '../types/taller'
 import { BosquejoVehiculo } from './BosquejoVehiculo'
-import { X, Clock, AlertTriangle, CheckCircle, FileText, Wrench, Shield, DollarSign, PenTool } from 'lucide-react'
+import { X, Clock, AlertTriangle, CheckCircle, FileText, Wrench, Shield, DollarSign, PenTool, Sparkles, Printer } from 'lucide-react'
+import { ModalComprobanteX } from '../features/facturacion/interno/ModalComprobanteX'
+import { SeccionComprobanteInternoX } from '../features/facturacion/interno/SeccionComprobanteInternoX'
+import type { ComprobanteInternoData, TipoComprobanteInterno } from '../features/facturacion/interno/types'
 
 interface Props {
   caso: CasoDemo | null
@@ -17,6 +20,8 @@ export const ModalDetalleCaso: React.FC<Props> = ({ caso, onClose }) => {
   const [showRepuestoModal, setShowRepuestoModal] = useState(false)
   const [showFirmaModal, setShowFirmaModal] = useState(false)
   const [firmaRealizada, setFirmaRealizada] = useState(false)
+  const [showModalInternoX, setShowModalInternoX] = useState(false)
+  const [comprobanteXParaVer, setComprobanteXParaVer] = useState<ComprobanteInternoData | null>(null)
 
   // Edit fields for insurance
   const [editSiniestro, setEditSiniestro] = useState(caso?.numero_siniestro || '')
@@ -168,6 +173,58 @@ export const ModalDetalleCaso: React.FC<Props> = ({ caso, onClose }) => {
                 )}
               </div>
             )}
+            {caso.numero_factura && (
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs font-mono flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-bold uppercase">Comprobante de Facturación</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <strong className="text-slate-900 text-sm">{caso.numero_factura}</strong>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                      caso.numero_factura.toUpperCase().startsWith('FX-') || caso.numero_factura.toUpperCase().startsWith('REM-') || caso.numero_factura.toUpperCase().startsWith('RCX-')
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-blue-900 text-white'
+                    }`}>
+                      {caso.numero_factura.toUpperCase().startsWith('FX-')
+                        ? 'Factura X (No Fiscal)'
+                        : caso.numero_factura.toUpperCase().startsWith('REM-')
+                        ? 'Remito X (No Fiscal)'
+                        : 'Fiscal ARCA (A/B)'}
+                    </span>
+                  </div>
+                </div>
+
+                {(caso.numero_factura.toUpperCase().startsWith('FX-') || caso.numero_factura.toUpperCase().startsWith('REM-') || caso.numero_factura.toUpperCase().startsWith('RCX-')) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      let tipo: TipoComprobanteInterno = 'Factura X'
+                      if (caso.numero_factura?.toUpperCase().startsWith('REM-')) tipo = 'Remito X'
+                      else if (caso.numero_factura?.toUpperCase().startsWith('RCX-')) tipo = 'Recibo X'
+
+                      setComprobanteXParaVer({
+                        tipo,
+                        puntoVenta: '0001',
+                        numero: 1,
+                        numeroCompleto: caso.numero_factura || '',
+                        fechaEmision: caso.fecha_factura || new Date().toISOString().split('T')[0],
+                        concepto: `Reparación sobre ${caso.vehiculo_marca_modelo} patente ${caso.patente}`,
+                        monto: caso.facturado_monto || caso.presupuesto_monto,
+                        casoId: caso.id,
+                        patente: caso.patente,
+                        vehiculo: caso.vehiculo_marca_modelo,
+                        clienteNombre: caso.cliente_nombre,
+                        clienteTelefono: caso.cliente_telefono,
+                        tallerNombre: 'Taller Mecánico & Carrocería',
+                      })
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-mono text-xs font-bold uppercase rounded cursor-pointer transition shadow-xs"
+                  >
+                    <Printer size={13} />
+                    <span>Ver / Imprimir Comprobante</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bosquejo de 16 Zonas */}
@@ -274,19 +331,33 @@ export const ModalDetalleCaso: React.FC<Props> = ({ caso, onClose }) => {
             {rol === 'dueno' && (
               <>
                 {caso.estado === 'firmado' && (
-                  <button
-                    onClick={() => {
-                      actualizarCaso(caso.id, {
-                        estado: 'facturado',
-                        facturado_monto: caso.presupuesto_monto,
-                        dias_en_etapa: 0
-                      })
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer flex items-center gap-1.5"
-                  >
-                    <FileText size={14} />
-                    <span>Emitir Factura (${caso.presupuesto_monto.toLocaleString()})</span>
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => {
+                        const num = `FC-B-0001-${Math.floor(1000 + Math.random() * 9000).toString().padStart(8, '0')}`
+                        const fecha = new Date().toISOString().split('T')[0]
+                        actualizarCaso(caso.id, {
+                          estado: 'facturado',
+                          facturado_monto: caso.presupuesto_monto,
+                          numero_factura: num,
+                          fecha_factura: fecha,
+                          dias_en_etapa: 0
+                        })
+                      }}
+                      className="px-3.5 py-2 bg-[#123a6b] hover:bg-[#123a6b]/90 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <FileText size={14} />
+                      <span>⚡ Factura Fiscal ARCA</span>
+                    </button>
+
+                    <button
+                      onClick={() => setShowModalInternoX(true)}
+                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <Sparkles size={14} className="text-amber-400" />
+                      <span>📋 Factura X / Remito (No Fiscal)</span>
+                    </button>
+                  </div>
                 )}
 
                 {caso.estado === 'facturado' && (
@@ -420,6 +491,57 @@ export const ModalDetalleCaso: React.FC<Props> = ({ caso, onClose }) => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Modal de Emisión de Factura X / Remito */}
+        {showModalInternoX && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-white p-4 sm:p-5 rounded-lg max-w-xl w-full space-y-3 shadow-2xl border-2 border-graphite">
+              <div className="flex items-center justify-between pb-2 border-b border-steel-200">
+                <div>
+                  <h3 className="font-display uppercase text-base sm:text-lg font-bold text-navy">
+                    Emitir Comprobante No Fiscal — {caso.patente}
+                  </h3>
+                  <span className="text-xs text-steel-500 font-mono">
+                    {caso.vehiculo_marca_modelo} • {caso.cliente_nombre}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModalInternoX(false)}
+                  className="p-1 rounded text-steel-500 hover:text-graphite cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <SeccionComprobanteInternoX
+                caso={caso}
+                montoFacturado={(caso.presupuesto_monto || 100000).toString()}
+                tallerNombre="Taller Mecánico & Carrocería"
+                onComprobanteEmitido={({ numeroFactura, fechaEmision, comprobanteData }) => {
+                  actualizarCaso(caso.id, {
+                    estado: 'facturado',
+                    numero_factura: numeroFactura,
+                    fecha_factura: fechaEmision,
+                    facturado_monto: comprobanteData.monto,
+                    dias_en_etapa: 0,
+                  })
+                  setShowModalInternoX(false)
+                  setComprobanteXParaVer(comprobanteData)
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Modal Imprimible de Comprobante X */}
+        {comprobanteXParaVer && (
+          <ModalComprobanteX
+            isOpen={!!comprobanteXParaVer}
+            onClose={() => setComprobanteXParaVer(null)}
+            data={comprobanteXParaVer}
+          />
         )}
       </div>
     </div>

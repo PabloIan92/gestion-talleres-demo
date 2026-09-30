@@ -7,12 +7,17 @@ import {
   Clock,
   DollarSign,
   FileText,
-  RefreshCw,
   Search,
-  ExternalLink
+  ExternalLink,
+  Sparkles,
+  X
 } from 'lucide-react'
 import { ModalConfiguracionArca } from '../features/facturacion/arca/ModalConfiguracionArca'
 import { getArcaConfig } from '../features/facturacion/arca/storage'
+import { ModalComprobanteX } from '../features/facturacion/interno/ModalComprobanteX'
+import { SeccionComprobanteInternoX } from '../features/facturacion/interno/SeccionComprobanteInternoX'
+import type { ComprobanteInternoData, TipoComprobanteInterno } from '../features/facturacion/interno/types'
+import type { CasoDemo } from '../types/taller'
 
 function formatMoneda(monto: number): string {
   return `$ ${new Intl.NumberFormat('es-AR', {
@@ -21,13 +26,45 @@ function formatMoneda(monto: number): string {
   }).format(monto)}`
 }
 
+export function getTipoComprobanteInfo(numeroFactura?: string): {
+  esInterno: boolean
+  etiqueta: string
+  tipo: 'arca' | 'factura_x' | 'remito_x' | 'recibo_x' | 'presupuesto_x' | 'sin_emitir'
+  badgeClass: string
+} {
+  if (!numeroFactura || !numeroFactura.trim() || numeroFactura.toLowerCase() === 'sin factura') {
+    return { esInterno: false, etiqueta: 'Sin emitir', tipo: 'sin_emitir', badgeClass: 'bg-steel-200 text-steel-700' }
+  }
+  const upper = numeroFactura.toUpperCase().trim()
+  if (upper.startsWith('FX-') || upper.startsWith('FCX-') || upper.startsWith('FACTURA X')) {
+    return { esInterno: true, etiqueta: 'Factura X (No Fiscal)', tipo: 'factura_x', badgeClass: 'bg-slate-800 text-white' }
+  }
+  if (upper.startsWith('REM-') || upper.startsWith('REMITO')) {
+    return { esInterno: true, etiqueta: 'Remito X (No Fiscal)', tipo: 'remito_x', badgeClass: 'bg-amber-800 text-white' }
+  }
+  if (upper.startsWith('RCX-') || upper.startsWith('RECIBO')) {
+    return { esInterno: true, etiqueta: 'Recibo X (No Fiscal)', tipo: 'recibo_x', badgeClass: 'bg-teal-800 text-white' }
+  }
+  if (upper.startsWith('PRE-')) {
+    return { esInterno: true, etiqueta: 'Presupuesto X', tipo: 'presupuesto_x', badgeClass: 'bg-zinc-700 text-white' }
+  }
+  if (upper.startsWith('X-')) {
+    return { esInterno: true, etiqueta: 'Comprobante X', tipo: 'factura_x', badgeClass: 'bg-slate-800 text-white' }
+  }
+  return { esInterno: false, etiqueta: 'ARCA Oficial (A/B)', tipo: 'arca', badgeClass: 'bg-navy text-white' }
+}
+
 export function FacturacionView() {
-  const { casos, setCasoSeleccionado } = useDemoStore()
+  const { casos, setCasoSeleccionado, actualizarCaso } = useDemoStore()
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
   const [filtroCanal, setFiltroCanal] = useState<string>('todos')
+  const [filtroTipoComprobante, setFiltroTipoComprobante] = useState<string>('todos')
   const [modalArcaAbierto, setModalArcaAbierto] = useState(false)
   const [arcaConfig, setArcaConfig] = useState(getArcaConfig())
+
+  const [comprobanteModal, setComprobanteModal] = useState<ComprobanteInternoData | null>(null)
+  const [casoParaEmitirX, setCasoParaEmitirX] = useState<CasoDemo | null>(null)
 
   // Mapear casos a items de facturación
   const items = useMemo(() => {
@@ -37,15 +74,24 @@ export function FacturacionView() {
       const diferencial = facturado > cobrado ? facturado - cobrado : 0
       const tieneFactura = ['facturado', 'cobrado', 'reclamo a la compañía'].includes(c.estado)
 
+      let numFactura = c.numero_factura || ''
+      if (!numFactura && tieneFactura) {
+        numFactura = c.canal === 'particular' && idx % 2 === 0
+          ? `FX-0001-${(100 + idx).toString().padStart(8, '0')}`
+          : `FC-B-0001-${(1000 + idx).toString().padStart(8, '0')}`
+      }
+
       return {
         caso_id: c.id,
         patente: c.patente,
         vehiculo: c.vehiculo_marca_modelo,
         cliente_nombre: c.cliente_nombre,
+        cliente_telefono: c.cliente_telefono,
         canal: c.canal,
         aseguradora: c.aseguradora,
         estado: c.estado,
-        numero_factura: tieneFactura ? `FC-B-${(100 + idx).toString().padStart(6, '0')}` : 'Sin Factura',
+        numero_factura: numFactura,
+        fecha_factura: c.fecha_factura || (tieneFactura ? c.created_at : ''),
         monto_facturado: facturado,
         monto_cobrado: cobrado,
         diferencial: diferencial,
@@ -54,15 +100,25 @@ export function FacturacionView() {
     })
   }, [casos])
 
-  // KPIs
+  // Métricas KPI con desglose Fiscal vs Interno No Fiscal
   const kpis = useMemo(() => {
     let facturado = 0
+    let facturadoFiscal = 0
+    let facturadoInterno = 0
     let cobrado = 0
     let pendiente = 0
     let enReclamo = 0
 
     for (const item of items) {
       facturado += item.monto_facturado
+      if (item.monto_facturado > 0) {
+        const info = getTipoComprobanteInfo(item.numero_factura)
+        if (info.esInterno) {
+          facturadoInterno += item.monto_facturado
+        } else if (info.tipo === 'arca') {
+          facturadoFiscal += item.monto_facturado
+        }
+      }
       cobrado += item.monto_cobrado
       if (item.diferencial > 0) {
         pendiente += item.diferencial
@@ -74,6 +130,8 @@ export function FacturacionView() {
 
     return {
       totalFacturado: facturado,
+      facturadoFiscal,
+      facturadoInterno,
       totalCobrado: cobrado,
       pendienteCobro: pendiente,
       enReclamoCount: enReclamo,
@@ -105,9 +163,46 @@ export function FacturacionView() {
         return false
       }
 
+      if (filtroTipoComprobante !== 'todos') {
+        const info = getTipoComprobanteInfo(item.numero_factura)
+        if (filtroTipoComprobante === 'fiscal' && info.tipo !== 'arca') {
+          return false
+        }
+        if (filtroTipoComprobante === 'interno' && !info.esInterno) {
+          return false
+        }
+        if (filtroTipoComprobante === 'sin_factura' && info.tipo !== 'sin_emitir') {
+          return false
+        }
+      }
+
       return true
     })
-  }, [items, filtroTexto, filtroEstado, filtroCanal])
+  }, [items, filtroTexto, filtroEstado, filtroCanal, filtroTipoComprobante])
+
+  function abrirModalComprobante(item: typeof items[number]) {
+    const info = getTipoComprobanteInfo(item.numero_factura)
+    let tipo: TipoComprobanteInterno = 'Factura X'
+    if (info.tipo === 'remito_x') tipo = 'Remito X'
+    else if (info.tipo === 'recibo_x') tipo = 'Recibo X'
+    else if (info.tipo === 'presupuesto_x') tipo = 'Presupuesto X'
+
+    setComprobanteModal({
+      tipo,
+      puntoVenta: '0001',
+      numero: 1,
+      numeroCompleto: item.numero_factura,
+      fechaEmision: item.fecha_factura || new Date().toISOString().split('T')[0],
+      concepto: `Reparación y servicio taller sobre ${item.vehiculo} patente ${item.patente}`,
+      monto: item.monto_facturado,
+      casoId: item.caso_id,
+      patente: item.patente,
+      vehiculo: item.vehiculo,
+      clienteNombre: item.cliente_nombre,
+      clienteTelefono: item.cliente_telefono,
+      tallerNombre: 'Taller Mecánico & Carrocería',
+    })
+  }
 
   return (
     <div className="p-3 sm:p-6 max-w-7xl mx-auto flex flex-col gap-4 sm:gap-6">
@@ -118,7 +213,7 @@ export function FacturacionView() {
             Facturación y Cobranza
           </h1>
           <p className="text-[11px] sm:text-xs font-mono text-steel-500 uppercase mt-0.5">
-            Panel exclusivo de control financiero y seguimiento de cobros
+            Panel exclusivo de control financiero: Facturación Fiscal ARCA y Comprobantes Internos (Factura X / Remitos)
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
@@ -140,14 +235,25 @@ export function FacturacionView() {
       {/* Tarjetas KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="bg-white border-2 border-graphite p-3 sm:p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-steel-500 mb-1">
-            <span className="text-[11px] sm:text-xs font-mono uppercase font-semibold">Total Facturado</span>
-            <DollarSign size={16} className="text-navy" />
+          <div>
+            <div className="flex items-center justify-between text-steel-500 mb-1">
+              <span className="text-[11px] sm:text-xs font-mono uppercase font-semibold">Total Facturado</span>
+              <DollarSign size={16} className="text-navy" />
+            </div>
+            <div className="text-lg sm:text-2xl font-display font-bold text-navy">
+              {formatMoneda(kpis.totalFacturado)}
+            </div>
           </div>
-          <div className="text-lg sm:text-2xl font-display font-bold text-navy">
-            {formatMoneda(kpis.totalFacturado)}
+          <div className="text-[10px] font-mono text-steel-500 mt-2 pt-2 border-t border-steel-200 flex flex-col gap-0.5">
+            <div className="flex justify-between">
+              <span>Fiscal ARCA:</span>
+              <span className="font-semibold text-navy">{formatMoneda(kpis.facturadoFiscal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Interno (X / Remitos):</span>
+              <span className="font-semibold text-graphite">{formatMoneda(kpis.facturadoInterno)}</span>
+            </div>
           </div>
-          <span className="text-[10px] sm:text-[11px] font-mono text-steel-400 mt-1">Facturas emitidas</span>
         </div>
 
         <div className="bg-white border-2 border-graphite p-3 sm:p-4 shadow-sm flex flex-col justify-between">
@@ -231,6 +337,23 @@ export function FacturacionView() {
               <option value="particular">Particular</option>
             </select>
           </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="filtro-comprobante" className="text-xs font-mono uppercase text-steel-500">
+              Comprobante:
+            </label>
+            <select
+              id="filtro-comprobante"
+              value={filtroTipoComprobante}
+              onChange={(e) => setFiltroTipoComprobante(e.target.value)}
+              className="text-sm font-sans border border-steel-300 py-1.5 px-2 bg-white focus:outline-none focus:border-navy"
+            >
+              <option value="todos">Todos los comprobantes</option>
+              <option value="fiscal">Fiscal ARCA (A / B)</option>
+              <option value="interno">Factura X / Remito (No Fiscal)</option>
+              <option value="sin_factura">Sin emitir</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -259,6 +382,7 @@ export function FacturacionView() {
             ) : (
               itemsFiltrados.map((item) => {
                 const tieneDiferencial = item.diferencial > 0
+                const info = getTipoComprobanteInfo(item.numero_factura)
                 return (
                   <tr key={item.caso_id} className="hover:bg-steel-50 transition">
                     <td className="p-3">
@@ -277,8 +401,38 @@ export function FacturacionView() {
                         {item.aseguradora ? ` • ${item.aseguradora.split(' ')[0]}` : ''}
                       </span>
                     </td>
-                    <td className="p-3 font-mono text-xs">
-                      {item.numero_factura}
+                    <td className="p-3">
+                      {item.numero_factura ? (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 font-mono text-xs">
+                            <FileText size={14} className="text-steel-400 shrink-0" />
+                            <span className="font-semibold">{item.numero_factura}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${info.badgeClass}`}
+                            >
+                              {info.etiqueta}
+                            </span>
+                            {info.esInterno && (
+                              <button
+                                type="button"
+                                onClick={() => abrirModalComprobante(item)}
+                                className="text-[10px] font-mono text-navy hover:underline font-bold cursor-pointer"
+                              >
+                                Ver / Imprimir
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-mono text-steel-400 italic">Sin emitir</span>
+                      )}
+                      {item.fecha_factura && (
+                        <span className="text-[11px] text-steel-400 font-mono block mt-0.5">
+                          {item.fecha_factura}
+                        </span>
+                      )}
                     </td>
                     <td className="p-3 text-right font-mono font-semibold">
                       {formatMoneda(item.monto_facturado)}
@@ -309,13 +463,26 @@ export function FacturacionView() {
                       </span>
                     </td>
                     <td className="p-3 text-center">
-                      <button
-                        onClick={() => setCasoSeleccionado(item.caso_original)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono border border-navy text-navy hover:bg-navy hover:text-white transition rounded-sm cursor-pointer"
-                      >
-                        <span>Ver Ficha</span>
-                        <ExternalLink size={12} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        {item.estado === 'firmado' && (
+                          <button
+                            type="button"
+                            onClick={() => setCasoParaEmitirX(item.caso_original)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-slate-800 text-white hover:bg-slate-900 transition rounded-sm cursor-pointer shadow-xs"
+                            title="Emitir Factura X o Remito no fiscal"
+                          >
+                            <Sparkles size={11} className="text-amber-400" />
+                            <span>Factura X</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setCasoSeleccionado(item.caso_original)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono border border-navy text-navy hover:bg-navy hover:text-white transition rounded-sm cursor-pointer"
+                        >
+                          <span>Ficha</span>
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -333,6 +500,57 @@ export function FacturacionView() {
           setArcaConfig(getArcaConfig())
         }}
       />
+
+      {/* Modal Visor/Impresión de Comprobante X */}
+      {comprobanteModal && (
+        <ModalComprobanteX
+          isOpen={!!comprobanteModal}
+          onClose={() => setComprobanteModal(null)}
+          data={comprobanteModal}
+        />
+      )}
+
+      {/* Modal Emisión Rápida de Factura X / Remito sobre un caso */}
+      {casoParaEmitirX && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-md shadow-2xl border-2 border-graphite max-w-xl w-full p-4 sm:p-5 relative animate-in fade-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-steel-200 mb-3">
+              <div>
+                <h3 className="font-display uppercase text-base sm:text-lg font-bold text-navy">
+                  Emitir Comprobante No Fiscal — {casoParaEmitirX.patente}
+                </h3>
+                <span className="text-xs text-steel-500 font-mono">
+                  {casoParaEmitirX.vehiculo_marca_modelo} • {casoParaEmitirX.cliente_nombre}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCasoParaEmitirX(null)}
+                className="p-1 rounded text-steel-500 hover:text-graphite cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <SeccionComprobanteInternoX
+              caso={casoParaEmitirX}
+              montoFacturado={(casoParaEmitirX.presupuesto_monto || 100000).toString()}
+              tallerNombre="Taller Mecánico & Carrocería"
+              onComprobanteEmitido={({ numeroFactura, fechaEmision, comprobanteData }) => {
+                actualizarCaso(casoParaEmitirX.id, {
+                  estado: 'facturado',
+                  numero_factura: numeroFactura,
+                  fecha_factura: fechaEmision,
+                  facturado_monto: comprobanteData.monto,
+                  dias_en_etapa: 0,
+                })
+                setCasoParaEmitirX(null)
+                setComprobanteModal(comprobanteData)
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
