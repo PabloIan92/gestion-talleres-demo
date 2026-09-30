@@ -74,6 +74,8 @@ export interface CasoDemo {
   inspeccion_guardada: boolean
 }
 
+export type Caso = CasoDemo
+
 export interface ItemStock {
   id: string
   codigo: string
